@@ -1,0 +1,2 @@
+rootProject.name='ChuniControl'
+include ':app'

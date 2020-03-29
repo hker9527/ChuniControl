@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/btnConnect"
+        android:title="Connect to..." />
+    <item
+        android:id="@+id/btnAir"
+        android:title="Set Air Sensitivity" />
+    <group android:checkableBehavior="all">
+        <item
+            android:id="@+id/chkLockBtn"
+            android:checkable="true"
+            android:checked="true"
+            android:icon="@android:drawable/ic_menu_preferences"
+            android:title="Lock Buttons"
+            android:titleCondensed="32" />
+        <item
+            android:id="@+id/chkLockOrient"
+            android:checkable="true"
+            android:checked="false"
+            android:icon="@android:drawable/ic_menu_preferences"
+            android:title="Lock Orientation"
+            android:titleCondensed="32" />
+    </group>
+    <group>
+        <item
+            android:id="@+id/btnSendCoin"
+            android:title="Coin" />
+        <item
+            android:id="@+id/btnSendTest"
+            android:title="Test" />
+        <item
+            android:id="@+id/btnSendService"
+            android:title="Service" />
+        <item
+            android:id="@+id/btnSendST"
+            android:title="Service+Test" />
+    </group>
+</menu>
