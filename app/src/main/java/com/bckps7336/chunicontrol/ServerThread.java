@@ -6,11 +6,13 @@ import java.net.DatagramSocket;
 
 public class ServerThread extends Thread {
     DatagramSocket socket;
-    MainActivity.ServerHandler serverHandler;
+    MainActivity.MainCallback mainCallback;
+    NetworkThread.ClientCallback clientCallback;
 
-    public ServerThread(MainActivity.ServerHandler handler, DatagramSocket socket) {
+    public ServerThread(MainActivity.MainCallback mainCallback, NetworkThread.ClientCallback clientCallback, DatagramSocket socket) {
         super();
-        this.serverHandler = handler;
+        this.mainCallback = mainCallback;
+        this.clientCallback = clientCallback;
         this.socket = socket;
     }
 
@@ -21,7 +23,9 @@ public class ServerThread extends Thread {
                 byte[] data = new byte[6];
                 DatagramPacket packet = new DatagramPacket(data, data.length);
                 socket.receive(packet);
-                serverHandler.handle(packet.getData());
+                byte[] data1 = packet.getData();
+                mainCallback.handle(data1);
+                clientCallback.handle(data1);
             } catch (IOException e) {
                 e.printStackTrace();
             }

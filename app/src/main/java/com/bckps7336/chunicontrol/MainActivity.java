@@ -30,13 +30,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.HashMap;
 
 public class MainActivity extends AppCompatActivity {
-    private final int KEY_COUNT = 16;
+    private final int KEY_COUNT = 8;
     NetworkThread networkThread;
-    ServerHandler serverHandler;
+    MainCallback mainCallback;
     private Button main;
     private int airIndex = -1; // Trace for finger that do air
     private VelocityTracker velocityTracker = null;
-    private int AIR_THERESHOLD;
+    private int AIR_THRESHOLD;
     private EditText txtHost;
     private AlertDialog dialogHost;
     private SeekBar seekAir;
@@ -50,13 +50,26 @@ public class MainActivity extends AppCompatActivity {
         else return -1;
     }
 
+    private boolean checkNetwork() {
+        if (networkThread == null) return false;
+
+        if (!networkThread.isConnected()) {
+            //sharedPreferences.edit().remove("ip").apply();
+            Toast.makeText(getApplicationContext(), "Ping failed! \n - Check your host firewall settings.\n - Check if the game is on.\n - Check if the host is correct.", Toast.LENGTH_LONG).show();
+            dialogHost.show();
+            return false;
+        }
+
+        return true;
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        serverHandler = new ServerHandler(this);
+        mainCallback = new MainCallback(this);
 
         queue = new HashMap<>();
 
@@ -64,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
         main.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                if (networkThread == null) return false;
+                if (!checkNetwork()) return false;
 
                 int action = event.getAction() & MotionEvent.ACTION_MASK;
                 int pointerIndex = (event.getAction() & MotionEvent.ACTION_POINTER_INDEX_MASK) >> MotionEvent.ACTION_POINTER_INDEX_SHIFT;
@@ -124,15 +137,15 @@ public class MainActivity extends AppCompatActivity {
                             velocityTracker.computeCurrentVelocity(1000);
 
                             double vy = velocityTracker.getYVelocity(_i);
-                            AIR_THERESHOLD = 5000;
+                            AIR_THRESHOLD = 5000;
 
-                            if (airIndex == -1 && vy < -AIR_THERESHOLD) { // No air ongoing
+                            if (airIndex == -1 && vy < -AIR_THRESHOLD) { // No air ongoing
                                 Log.d("KeyAction", "AIR SWIPE ON");
                                 airIndex = _i;
                                 networkThread.sendKey(false, index);
                                 networkThread.sendAir(true);
                                 main.setBackgroundColor(getResources().getColor(R.color.colorMainOn));
-                            } else if (airIndex == _i && vy > AIR_THERESHOLD) { // Air ongoing and same finger
+                            } else if (airIndex == _i && vy > AIR_THRESHOLD) { // Air ongoing and same finger
                                 Log.d("KeyAction", "AIR SWIPE OFF");
                                 airIndex = -1;
                                 networkThread.sendAir(false);
@@ -155,11 +168,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 String host = txtHost.getText().toString();
-                networkThread = new NetworkThread(serverHandler, host);
+                networkThread = new NetworkThread(mainCallback, host);
                 networkThread.start();
-                if (networkThread.isConnected()) {
-                    sharedPreferences.edit().putString("ip", host).apply();
-                }
+                sharedPreferences.edit().putString("ip", txtHost.getText().toString()).apply();
             }
         });
 
@@ -170,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
 
         seekAir = new SeekBar(this);
         seekAir.setMax(100);
-        seekAir.setProgress(AIR_THERESHOLD);
+        seekAir.setProgress(AIR_THRESHOLD);
         seekAir.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -202,20 +213,16 @@ public class MainActivity extends AppCompatActivity {
 
         sharedPreferences = getSharedPreferences("data", MODE_PRIVATE);
         if (sharedPreferences.contains("ip")) {
-            networkThread = new NetworkThread(serverHandler, sharedPreferences.getString("ip", ""));
+            String host = sharedPreferences.getString("ip", "");
+            networkThread = new NetworkThread(mainCallback, host);
             networkThread.start();
-            if (networkThread.isConnected()) {
-
-            } else {
-                sharedPreferences.edit().remove("ip").apply();
-                dialogHost.show();
-            }
+            txtHost.setText(host);
         } else {
             dialogHost.show();
         }
 
         if (sharedPreferences.contains("airThreshold")) {
-            AIR_THERESHOLD = sharedPreferences.getInt("airThreshold", 5000);
+            AIR_THRESHOLD = sharedPreferences.getInt("airThreshold", 5000);
         } else {
             sharedPreferences.edit().putInt("airThreshold", 5000).apply();
         }
@@ -304,11 +311,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public class ServerHandler {
+    public class MainCallback {
         private MainActivity parent;
         private TextView[] btnPlaceholderArray;
+        /*
+        private int prevColor = -1;
+        private int colorArray[] = new int[16];
+        private final int COLOR_NONE = Color.rgb(0, 0, 0);
+         */
 
-        public ServerHandler(MainActivity parent) {
+        public MainCallback(MainActivity parent) {
             super();
             this.parent = parent;
             this.btnPlaceholderArray = new TextView[]{
@@ -336,12 +348,41 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     // assert data[0] == 0x0 && data[1] == 0x3; // LED_SET
-                    int target = data[2];
-                    int color = Color.rgb(data[3] & 0xFF, data[4] & 0xFF, data[5] & 0xFF);
-                    if (color == Color.BLACK) color = Color.TRANSPARENT;
-                    //Log.d("Color", "Slider " + target + ", Color" + color);
-                    btnPlaceholderArray[0xf - target] // reverse
-                            .setBackgroundColor(color);
+                    switch (data[1]) {
+                        case Constant.TYPE_LED_SET:
+                            int target = 0xf - data[2];
+                            int color = Color.rgb(data[3] & 0xFF, data[4] & 0xFF, data[5] & 0xFF);
+
+                            // TODO: Make fadein & fadeout effect v
+                            /*
+                            colorArray[target] = color;
+                            if (color == prevColor) { // Continous block
+                                btnPlaceholderArray[target].setBackgroundColor(color);
+                            } else if (target == 0 && color != 0) { // Key 0
+                                int[] fadeIn = {Color.TRANSPARENT, color};
+                                GradientDrawable gdIn = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, fadeIn);
+                                gdIn.setCornerRadius(0);
+                                btnPlaceholderArray[target].setBackground(gdIn);
+                            } else if (color != COLOR_NONE) { // New block
+                                int[] fo = {prevColor, Color.TRANSPARENT};
+                                GradientDrawable gdOut = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, fo);
+                                gdOut.setCornerRadius(0);
+                                btnPlaceholderArray[target - 1].setBackground(gdOut);
+
+                                int[] fi = {Color.TRANSPARENT, color};
+                                GradientDrawable gdIn = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, fi);
+                                gdIn.setCornerRadius(0);
+                                btnPlaceholderArray[target].setBackground(gdIn);
+                            }
+                            prevColor = color;*/
+
+                            btnPlaceholderArray[target].setBackgroundColor(color);
+                            break;
+                        case Constant.TYPE_PONG:
+                            break;
+                        default:
+                            break;
+                    }
                 }
             });
         }
