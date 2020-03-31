@@ -7,6 +7,7 @@ import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Display;
@@ -376,7 +377,10 @@ public class MainActivity extends AppCompatActivity {
                             }
                             prevColor = color;*/
 
-                            btnPlaceholderArray[target].setBackgroundColor(color);
+                            int[] colors = {Color.TRANSPARENT, color};
+                            GradientDrawable gradientDrawable = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors);
+                            gradientDrawable.setCornerRadius(0);
+                            btnPlaceholderArray[target].setBackground(gradientDrawable);
                             break;
                         case Constant.TYPE_PONG:
                             break;
