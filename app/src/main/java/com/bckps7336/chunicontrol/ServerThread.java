@@ -28,6 +28,7 @@ public class ServerThread extends Thread {
                 clientCallback.handle(data1);
             } catch (IOException e) {
                 e.printStackTrace();
+                break;
             }
         }
     }

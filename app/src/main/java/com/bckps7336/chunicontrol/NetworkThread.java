@@ -19,15 +19,16 @@ public class NetworkThread extends Thread {
     //List<DatagramPacket> queue;
     DatagramPacket packet;
 
+    final int TIMEOUT = 100;
     ClientCallback clientCallback;
-    boolean connected;
+    MainActivity.MainCallback mainCallback;
 
     boolean[] bitMask;
-
+    boolean connected = true;
     long timeSend;
     long timePacket;
     boolean pingSent, pingReceived;
-    int latency;
+    int latency = -1;
 
     public NetworkThread(MainActivity.MainCallback mainCallback, String host) {
         super();
@@ -35,8 +36,10 @@ public class NetworkThread extends Thread {
             address = InetAddress.getByName(host);
             port = 24864;
 
+            this.mainCallback = mainCallback;
             clientCallback = new ClientCallback();
             socket = new DatagramSocket();
+            //socket.setSoTimeout(TIMEOUT);
 
             ServerThread serverThread = new ServerThread(mainCallback, clientCallback, socket);
             serverThread.start();
@@ -55,6 +58,19 @@ public class NetworkThread extends Thread {
     }
 
     public boolean isConnected() {
+        if (latency == -1 && !pingSent) { // Not yet pinged
+            sendPing();
+            try {
+                int count = 0;
+                while (count < TIMEOUT) { // Wait 100 ms
+                    Thread.sleep(1);
+                    count++;
+                    if (latency != -1) break;
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         return connected;
     }
 
@@ -97,8 +113,10 @@ public class NetworkThread extends Thread {
 
     public void sendKey(boolean isPressed, int key) { // key: 0-15, but protocol counts first key as F
         // send(new byte[]{0x1, (byte) (isPressed ? 0x1 : 0x2), (byte) (0xf - key), 0x0, 0x0, 0x0});
-        bitMask[0xf - (key * 2)] = isPressed;
-        bitMask[0xf - (key * 2) - 1] = isPressed;
+        //bitMask[0xf - (key * 2)] = isPressed;
+        //bitMask[0xf - (key * 2) - 1] = isPressed;
+        bitMask[0xf - key] = isPressed;
+        bitMask[Math.min(0xf - key + 1, 0xf)] = isPressed;
         sendBitmask();
     }
 
@@ -119,8 +137,8 @@ public class NetworkThread extends Thread {
     }
 
     public void sendPing() {
+        pingSent = true;
         pingReceived = false;
-        timeSend = System.currentTimeMillis();
         send(Constant.TYPE_PING);
     }
 
@@ -130,19 +148,18 @@ public class NetworkThread extends Thread {
             while (true) {
                 long currentTime = System.currentTimeMillis();
                 if (packet != null) {
+                    timeSend = System.currentTimeMillis();
                     socket.send(packet);
                     packet = null;
                     timePacket = currentTime;
                 }
 
-                if (!pingSent && (currentTime - timePacket >= 1000)) { // Check ping every 10 second of inactivity
+                if (!pingSent && (currentTime - timePacket >= 10000)) { // Check ping every 10 second of inactivity
                     sendPing();
-                    timePacket = currentTime;
                 }
 
-                if (pingSent && !pingReceived && (currentTime - timeSend > 1000)) { // If sent ping and 1s passed
+                if (pingSent && !pingReceived && (currentTime - timeSend > TIMEOUT)) { // If sent ping and 1s passed
                     connected = false;
-                    pingSent = false;
                     break;
                 }
                 Thread.sleep(0, 1); // ASAP
@@ -158,17 +175,17 @@ public class NetworkThread extends Thread {
         }
 
         public void handle(final byte[] data) {
+            connected = true;
+            latency = (int) (System.currentTimeMillis() - timeSend);
             switch (data[1]) {
                 case Constant.TYPE_PONG:
-                    latency = (int) (System.currentTimeMillis() - timeSend);
                     pingReceived = true;
-                    connected = true;
-
-                    Log.d("ping", String.valueOf(latency));
                     break;
                 default:
+                    mainCallback.handle(data);
                     break;
             }
+            //Log.d("ping", String.valueOf(latency));
         }
     }
 }

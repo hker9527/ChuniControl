@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
@@ -31,7 +32,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.HashMap;
 
 public class MainActivity extends AppCompatActivity {
-    private final int KEY_COUNT = 8;
+    private final int KEY_COUNT = 16;
     NetworkThread networkThread;
     MainCallback mainCallback;
     private Button main;
@@ -52,11 +53,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean checkNetwork() {
-        if (networkThread == null) return false;
+        if (networkThread == null) {
+            dialogHost.show();
+            return false;
+        }
 
         if (!networkThread.isConnected()) {
             //sharedPreferences.edit().remove("ip").apply();
-            Toast.makeText(getApplicationContext(), "Ping failed! \n - Check your host firewall settings.\n - Check if the game is on.\n - Check if the host is correct.", Toast.LENGTH_LONG).show();
+            networkThread = null;
+            Toast.makeText(getApplicationContext(), "Connection failed! \n - Check your host firewall settings.\n - Check if the game is on.\n - Check if the host is correct.", Toast.LENGTH_LONG).show();
             dialogHost.show();
             return false;
         }
@@ -138,7 +143,6 @@ public class MainActivity extends AppCompatActivity {
                             velocityTracker.computeCurrentVelocity(1000);
 
                             double vy = velocityTracker.getYVelocity(_i);
-                            AIR_THRESHOLD = 5000;
 
                             if (airIndex == -1 && vy < -AIR_THRESHOLD) { // No air ongoing
                                 Log.d("KeyAction", "AIR SWIPE ON");
@@ -165,28 +169,39 @@ public class MainActivity extends AppCompatActivity {
         txtHost = new EditText(this);
         builder.setView(txtHost);
 
-        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                String host = txtHost.getText().toString();
-                networkThread = new NetworkThread(mainCallback, host);
-                networkThread.start();
-                sharedPreferences.edit().putString("ip", txtHost.getText().toString()).apply();
-            }
-        });
+        builder.setPositiveButton("OK", null);
 
         dialogHost = builder.create();
 
+        dialogHost.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(final DialogInterface dialog) {
+                Button button = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_POSITIVE);
+                button.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        String host = txtHost.getText().toString();
+                        networkThread = new NetworkThread(mainCallback, host);
+                        networkThread.start();
+                        if (checkNetwork()) {
+                            dialog.dismiss();
+                            sharedPreferences.edit().putString("ip", txtHost.getText().toString()).apply();
+                        }
+                    }
+                });
+            }
+        });
         builder = new AlertDialog.Builder(this);
         builder.setTitle("Air Sensitivity");
 
         seekAir = new SeekBar(this);
         seekAir.setMax(100);
-        seekAir.setProgress(AIR_THRESHOLD);
+        seekAir.setProgress(AIR_THRESHOLD / 100);
         seekAir.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                dialogAir.setTitle(String.valueOf(progress * 500));
+                int value = progress * 100;
+                dialogAir.setTitle(String.valueOf(value));
             }
 
             @Override
@@ -207,6 +222,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(DialogInterface dialog, int which) {
                 int value = seekAir.getProgress();
                 sharedPreferences.edit().putInt("airThreshold", value).apply();
+                AIR_THRESHOLD = value * 100;
             }
         });
 
@@ -218,14 +234,15 @@ public class MainActivity extends AppCompatActivity {
             networkThread = new NetworkThread(mainCallback, host);
             networkThread.start();
             txtHost.setText(host);
+            checkNetwork();
         } else {
             dialogHost.show();
         }
 
         if (sharedPreferences.contains("airThreshold")) {
-            AIR_THRESHOLD = sharedPreferences.getInt("airThreshold", 5000);
-        } else {
-            sharedPreferences.edit().putInt("airThreshold", 5000).apply();
+            int value = sharedPreferences.getInt("airThreshold", 50);
+            AIR_THRESHOLD = value * 100;
+            seekAir.setProgress(value);
         }
     }
 
@@ -268,26 +285,36 @@ public class MainActivity extends AppCompatActivity {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
                 }
                 break;
-            case R.id.btnSendCoin:
-                if (networkThread != null)
-                    if (networkThread.isConnected()) networkThread.sendCoin();
+            case R.id.btnUsbNet:
+                Intent tetherSettings = new Intent();
+                tetherSettings.setClassName("com.android.settings", "com.android.settings.TetherSettings");
+                startActivity(tetherSettings);
                 break;
-            case R.id.btnSendService:
-                if (networkThread != null)
-                    if (networkThread.isConnected()) networkThread.sendService();
+            default: // All network-required functions
+                if (!checkNetwork()) break;
+
+                switch (item.getItemId()) {
+                    case R.id.btnSendCoin:
+                        networkThread.sendCoin();
+                        break;
+                    case R.id.btnSendService:
+                        networkThread.sendService();
+                        break;
+                    case R.id.btnSendST:
+                        networkThread.sendService();
+                        networkThread.sendTest();
+                        break;
+                    case R.id.btnSendTest:
+                        networkThread.sendTest();
+                        break;
+                    case R.id.btnSendShut:
+                        networkThread.sendShutdown();
+                        this.finishAffinity();
+                        break;
+                    default:
+                        return super.onOptionsItemSelected(item);
+                }
                 break;
-            case R.id.btnSendST:
-                if (networkThread != null)
-                    if (networkThread.isConnected()) networkThread.sendService();
-                if (networkThread != null)
-                    if (networkThread.isConnected()) networkThread.sendTest();
-                break;
-            case R.id.btnSendTest:
-                if (networkThread != null)
-                    if (networkThread.isConnected()) networkThread.sendTest();
-                break;
-            default:
-                return super.onOptionsItemSelected(item);
         }
         return true;
     }

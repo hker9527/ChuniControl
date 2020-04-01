@@ -35,5 +35,11 @@
         <item
             android:id="@+id/btnSendST"
             android:title="Service+Test" />
+        <item
+            android:id="@+id/btnSendShut"
+            android:title="Shutdown" />
     </group>
+    <item
+        android:id="@+id/btnUsbNet"
+        android:title="USB Network Menu" />
 </menu>
