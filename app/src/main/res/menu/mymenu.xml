@@ -10,7 +10,8 @@
         <item
             android:id="@+id/chkLockBtn"
             android:checkable="true"
-            android:checked="true"
+            android:checked="false"
+            android:enabled="true"
             android:icon="@android:drawable/ic_menu_preferences"
             android:title="Lock Buttons"
             android:titleCondensed="32" />

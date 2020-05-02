@@ -1,0 +1,82 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="Server">
+
+        <EditTextPreference
+            app:key="addr"
+            app:title="Server address"
+            app:useSimpleSummaryProvider="true" />
+        <Preference android:title="Open USB Network Menu">
+            <intent
+                android:targetClass="com.android.settings.TetherSettings"
+                android:targetPackage="com.android.settings" />
+        </Preference>
+        <Preference
+            app:key="ping"
+            app:title="Test connection..." />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Special buttons">
+        <Preference
+            app:key="coin"
+            app:title="Coin" />
+
+        <Preference
+            app:key="service"
+            app:title="Service" />
+
+        <Preference
+            app:key="test"
+            app:title="Test" />
+
+        <Preference
+            app:key="st"
+            app:title="Service + Test" />
+
+        <Preference
+            app:key="shutdown"
+            app:title="Shutdown" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="Control">
+        <SeekBarPreference
+            android:defaultValue="0"
+            android:key="airThreshold"
+            android:max="100"
+            android:summary="How sensitive is a AIR trigger?"
+            android:title="Air threshold" />
+
+        <SwitchPreferenceCompat
+            app:key="lockButtons"
+            app:title="Lock Buttons" />
+
+        <SwitchPreferenceCompat
+            app:dependency="lockButtons"
+            app:key="lockBack"
+            app:title="Lock Back" />
+
+        <SwitchPreferenceCompat
+            app:dependency="lockButtons"
+            app:key="lockTask"
+            app:title="Lock Task" />
+
+        <SwitchPreferenceCompat
+            app:dependency="lockButtons"
+            app:key="lockHome"
+            app:summary="Requires to set this app to default launcher"
+            app:title="Lock Home" />
+
+        <SwitchPreferenceCompat
+            app:key="lockOrientation"
+            app:title="Lock Orientation" />
+
+        <SwitchPreferenceCompat
+            app:dependency="lockOrientation"
+            app:key="lockOrientationRotation"
+            app:summary="Just toggle if the result is reversed."
+            app:title="Rotation" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

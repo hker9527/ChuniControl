@@ -11,7 +11,9 @@ import java.net.UnknownHostException;
 
 import tech.gusavila92.apache.commons.codec.binary.Hex;
 
-public class NetworkThread extends Thread {
+public class ClientThread extends Thread {
+    boolean flag = true;
+
     InetAddress address;
     int port;
 
@@ -21,27 +23,29 @@ public class NetworkThread extends Thread {
 
     final int TIMEOUT = 100;
     ClientCallback clientCallback;
-    MainActivity.MainCallback mainCallback;
+    NetworkCallback networkCallback;
+
+    ServerThread serverThread;
 
     boolean[] bitMask;
-    boolean connected = true;
+    boolean connected = false;
     long timeSend;
     long timePacket;
     boolean pingSent, pingReceived;
-    int latency = -1;
+    int ping = -1;
 
-    public NetworkThread(MainActivity.MainCallback mainCallback, String host) {
+    public ClientThread(NetworkCallback networkCallback, String host) {
         super();
         try {
             address = InetAddress.getByName(host);
             port = 24864;
 
-            this.mainCallback = mainCallback;
             clientCallback = new ClientCallback();
             socket = new DatagramSocket();
-            //socket.setSoTimeout(TIMEOUT);
 
-            ServerThread serverThread = new ServerThread(mainCallback, clientCallback, socket);
+            this.networkCallback = networkCallback;
+
+            serverThread = new ServerThread(clientCallback, socket);
             serverThread.start();
 
             sendPing();
@@ -53,19 +57,19 @@ public class NetworkThread extends Thread {
         }
     }
 
-    public int getLatency() {
-        return latency;
+    public int getPing() {
+        return ping;
     }
 
     public boolean isConnected() {
-        if (latency == -1 && !pingSent) { // Not yet pinged
-            sendPing();
+        if (ping == -1) { // Not yet pinged
+            if (!pingSent) sendPing();
             try {
                 int count = 0;
                 while (count < TIMEOUT) { // Wait 100 ms
                     Thread.sleep(1);
                     count++;
-                    if (latency != -1) break;
+                    if (ping != -1) break;
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -115,8 +119,8 @@ public class NetworkThread extends Thread {
         // send(new byte[]{0x1, (byte) (isPressed ? 0x1 : 0x2), (byte) (0xf - key), 0x0, 0x0, 0x0});
         //bitMask[0xf - (key * 2)] = isPressed;
         //bitMask[0xf - (key * 2) - 1] = isPressed;
-        bitMask[0xf - key] = isPressed;
-        bitMask[Math.min(0xf - key + 1, 0xf)] = isPressed;
+        bitMask[key] = isPressed;
+        bitMask[Math.min(key + 1, 0xf)] = isPressed;
         sendBitmask();
     }
 
@@ -142,10 +146,15 @@ public class NetworkThread extends Thread {
         send(Constant.TYPE_PING);
     }
 
+    public synchronized void stopIt() {
+        flag = false;
+        serverThread.stopIt();
+    }
+
     @Override
     public void run() {
         try {
-            while (true) {
+            while (flag) {
                 long currentTime = System.currentTimeMillis();
                 if (packet != null) {
                     timeSend = System.currentTimeMillis();
@@ -158,8 +167,10 @@ public class NetworkThread extends Thread {
                     sendPing();
                 }
 
-                if (pingSent && !pingReceived && (currentTime - timeSend > TIMEOUT)) { // If sent ping and 1s passed
+                if (pingSent && !pingReceived && (currentTime - timeSend > TIMEOUT)) { // If sent ping and 0.1s passed
+                    Log.d("client", "timeout");
                     connected = false;
+                    stopIt();
                     break;
                 }
                 Thread.sleep(0, 1); // ASAP
@@ -167,25 +178,22 @@ public class NetworkThread extends Thread {
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+
     }
 
     public class ClientCallback {
-        public ClientCallback() {
-            super();
-        }
-
         public void handle(final byte[] data) {
             connected = true;
-            latency = (int) (System.currentTimeMillis() - timeSend);
+            ping = (int) (System.currentTimeMillis() - timeSend);
+            networkCallback.handle(data);
             switch (data[1]) {
                 case Constant.TYPE_PONG:
                     pingReceived = true;
                     break;
                 default:
-                    mainCallback.handle(data);
                     break;
             }
-            //Log.d("ping", String.valueOf(latency));
+            Log.d("ping", String.valueOf(ping));
         }
     }
 }

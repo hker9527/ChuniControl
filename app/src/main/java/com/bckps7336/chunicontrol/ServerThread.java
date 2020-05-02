@@ -5,26 +5,29 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 
 public class ServerThread extends Thread {
-    DatagramSocket socket;
-    MainActivity.MainCallback mainCallback;
-    NetworkThread.ClientCallback clientCallback;
+    Boolean flag = true;
 
-    public ServerThread(MainActivity.MainCallback mainCallback, NetworkThread.ClientCallback clientCallback, DatagramSocket socket) {
+    DatagramSocket socket;
+    ClientThread.ClientCallback clientCallback;
+
+    public ServerThread(ClientThread.ClientCallback clientCallback, DatagramSocket socket) {
         super();
-        this.mainCallback = mainCallback;
         this.clientCallback = clientCallback;
         this.socket = socket;
     }
 
+    public synchronized void stopIt() {
+        flag = false;
+    }
+
     @Override
     public void run() {
-        while (true) {
+        while (flag) {
             try {
                 byte[] data = new byte[6];
                 DatagramPacket packet = new DatagramPacket(data, data.length);
                 socket.receive(packet);
                 byte[] data1 = packet.getData();
-                mainCallback.handle(data1);
                 clientCallback.handle(data1);
             } catch (IOException e) {
                 e.printStackTrace();
