@@ -227,7 +227,7 @@ public class ControlActivity extends AppCompatActivity {
     public boolean onKeyLongPress(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (longPressedExit) {
-                finishAffinity();
+                finish();
             } else {
                 longPressedExit = true;
                 makeToast("Long press one more time to exit.");
