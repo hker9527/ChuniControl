@@ -3,6 +3,8 @@ Play the game with your android devices.
 
 This app requires https://github.com/hker9527/chuniio to be installed to the game.
 
+(Update 2020-08-04: Please update the library above)
+
 Interface
 ----
 ![Main owo](https://cdn.discordapp.com/attachments/342372275305054210/706389838433091755/Screenshot_2020-05-03-14-17-59.png)
@@ -24,3 +26,4 @@ TO-DO
 ----
 - [ ] Lock Home button by using launcher
 - [ ] Custom resolution support (1-to-n buttons at the same time)
+- [ ] 32-key support
