@@ -13,12 +13,10 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
-import android.view.Display;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
-import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -57,14 +55,17 @@ public class ControlActivity extends AppCompatActivity {
         Toast.makeText(getApplicationContext(), s, Toast.LENGTH_SHORT).show();
     }
 
-    private void showChooseHomeDialog() {
+    private void resetHome(boolean isShowDialog) {
         PackageManager p = getPackageManager();
         ComponentName cN = new ComponentName(getApplicationContext(), FakeHome.class);
         p.setComponentEnabledSetting(cN, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
 
-        Intent selector = new Intent(Intent.ACTION_MAIN);
-        selector.addCategory(Intent.CATEGORY_HOME);
-        startActivity(selector);
+        if (isShowDialog) {
+            Intent selector = new Intent(Intent.ACTION_MAIN);
+            selector.addCategory(Intent.CATEGORY_HOME);
+            selector.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(selector);
+        }
 
         p.setComponentEnabledSetting(cN, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
     }
@@ -97,6 +98,7 @@ public class ControlActivity extends AppCompatActivity {
         isLockBack = sharedPreferences.getBoolean("lockBack", false);
 
         isLockOrientation = sharedPreferences.getBoolean("lockOrientation", false);
+        lockOrientationRotation = sharedPreferences.getBoolean("lockOrientationRotation", false);
     }
 
     @SuppressLint({"ClickableViewAccessibility", "SourceLockedOrientationActivity"})
@@ -118,8 +120,6 @@ public class ControlActivity extends AppCompatActivity {
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
         if (isLockOrientation) {
-            Display display = ((WindowManager) getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
-
             if (lockOrientationRotation) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             } else {
@@ -128,6 +128,7 @@ public class ControlActivity extends AppCompatActivity {
         } else {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         }
+
         // Callback from server thread
         controlCallback = new ControlCallback(this);
 
@@ -228,6 +229,8 @@ public class ControlActivity extends AppCompatActivity {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (longPressedExit) {
                 finish();
+                resetHome(true);
+                return true;
             } else {
                 longPressedExit = true;
                 makeToast("Long press one more time to exit.");
@@ -250,7 +253,7 @@ public class ControlActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (isLockBack) {
+        if (isLockBack && !longPressedExit) {
             makeToast("Locked back button! Press menu to unlock. To quit app, long press.");
         } else {
             super.onBackPressed();
@@ -270,12 +273,11 @@ public class ControlActivity extends AppCompatActivity {
 
     @Override
     public void onResume() { // Check if app is being set as home screen
-        if (isAppNotHome() && isLockHome) showChooseHomeDialog();
+        if (isAppNotHome() && isLockHome) resetHome(true);
         super.onResume();
     }
 
     public class ControlCallback extends NetworkCallback {
-        private ControlActivity parent;
         private TextView[] btnPlaceholderArray;
         /*
         private int prevColor = -1;
@@ -285,7 +287,6 @@ public class ControlActivity extends AppCompatActivity {
 
         public ControlCallback(ControlActivity parent) {
             super();
-            this.parent = parent;
             this.btnPlaceholderArray = new TextView[]{
                     parent.findViewById(R.id.tv0),
                     parent.findViewById(R.id.tv1),

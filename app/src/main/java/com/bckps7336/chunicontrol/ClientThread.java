@@ -8,6 +8,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import tech.gusavila92.apache.commons.codec.binary.Hex;
 
@@ -18,10 +19,9 @@ public class ClientThread extends Thread {
     int port;
 
     DatagramSocket socket;
-    //List<DatagramPacket> queue;
-    DatagramPacket packet;
-
-    final int TIMEOUT = 100;
+    final int TIMEOUT = 1000;
+    // DatagramPacket packet;
+    ConcurrentLinkedQueue<DatagramPacket> queue;
     ClientCallback clientCallback;
     NetworkCallback networkCallback;
 
@@ -42,6 +42,7 @@ public class ClientThread extends Thread {
 
             clientCallback = new ClientCallback();
             socket = new DatagramSocket();
+            queue = new ConcurrentLinkedQueue<>();
 
             this.networkCallback = networkCallback;
 
@@ -79,9 +80,9 @@ public class ClientThread extends Thread {
     }
 
     private void _send(byte[] bytes) {
-        while (packet != null) ;// Ensure the packet queued get sent before the new packet
-        // Log.d("packet", Hex.encodeHexString(bytes));
-        packet = new DatagramPacket(bytes, bytes.length, address, port);
+        // while (packet != null) ;// Ensure the packet queued get sent before the new packet
+        Log.d("packet", Hex.encodeHexString(bytes));
+        queue.offer(new DatagramPacket(bytes, bytes.length, address, port));
     }
 
     private void send(int action) {
@@ -115,12 +116,10 @@ public class ClientThread extends Thread {
         sendBitmask();
     }
 
-    public void sendKey(boolean isPressed, int key) { // key: 0-15, but protocol counts first key as F
-        // send(new byte[]{0x1, (byte) (isPressed ? 0x1 : 0x2), (byte) (0xf - key), 0x0, 0x0, 0x0});
-        //bitMask[0xf - (key * 2)] = isPressed;
-        //bitMask[0xf - (key * 2) - 1] = isPressed;
-        bitMask[key] = isPressed;
-        bitMask[Math.min(key + 1, 0xf)] = isPressed;
+    public void sendKey(boolean isPressed, int key) { // key: 0-15, but protocol counts first key as 0xF
+        bitMask[0xf - key] = isPressed;
+        // bitMask[key] = isPressed;
+        // bitMask[Math.min(key + 1, 0xf)] = isPressed;
         sendBitmask();
     }
 
@@ -156,10 +155,11 @@ public class ClientThread extends Thread {
         try {
             while (flag) {
                 long currentTime = System.currentTimeMillis();
-                if (packet != null) {
+                //if (packet != null) {
+                DatagramPacket packet;
+                while ((packet = queue.poll()) != null) {
                     timeSend = System.currentTimeMillis();
                     socket.send(packet);
-                    packet = null;
                     timePacket = currentTime;
                 }
 
@@ -167,7 +167,7 @@ public class ClientThread extends Thread {
                     sendPing();
                 }
 
-                if (pingSent && !pingReceived && (currentTime - timeSend > TIMEOUT)) { // If sent ping and 0.1s passed
+                if (pingSent && !pingReceived && (currentTime - timeSend > TIMEOUT)) { // If sent ping and TIMEOUT passed
                     Log.d("client", "timeout");
                     connected = false;
                     stopIt();
